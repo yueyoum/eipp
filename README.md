@@ -39,7 +39,6 @@ if(!decoder.is_valid()) {
 }
 
 std::cout << typeid(result).name() << ", " << result << std::endl;
-std::cout << result << std::endl;
 
 // output:
 // l, 101
