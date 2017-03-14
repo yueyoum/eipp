@@ -47,8 +47,8 @@ namespace detail {
         }
 
     private:
-        friend class LongDecoder;
-        friend class DoubleDecoder;
+        friend struct LongDecoder;
+        friend struct DoubleDecoder;
         T value;
     };
 
@@ -73,8 +73,8 @@ namespace detail {
         }
 
     private:
-        friend class StringDecoder;
-        friend class BinaryDecoder;
+        friend struct StringDecoder;
+        friend struct BinaryDecoder;
         char * char_ptr_value;
         int len;
         std::string value;
@@ -124,11 +124,11 @@ namespace detail {
 
 
     template <typename ... Ts>
-    int compound_decoder(const char* buf, int* index, std::vector<struct _Base*>*);
+    int compound_decoder(const char* buf, int* index, std::vector<class _Base*>*);
 
     template <typename T, typename ... Ts>
-    int compound_decoder_helper(const char* buf, int* index, std::vector<struct _Base*>* vec) {
-        struct _Base* t = new T();
+    int compound_decoder_helper(const char* buf, int* index, std::vector<class _Base*>* vec) {
+        class _Base* t = new T();
         int ret = t->decode(buf, index);
         vec->push_back(t);
 
@@ -140,12 +140,12 @@ namespace detail {
     };
 
     template <typename ... Ts>
-    int compound_decoder(const char* buf, int* index, std::vector<struct _Base*>* vec) {
+    int compound_decoder(const char* buf, int* index, std::vector<class _Base*>* vec) {
         return compound_decoder_helper<Ts...>(buf, index, vec);
     }
 
     template <>
-    int compound_decoder<>(const char*, int*, std::vector<struct _Base*>*) {
+    int compound_decoder<>(const char*, int*, std::vector<class _Base*>*) {
         return 0;
     }
 
@@ -157,7 +157,7 @@ namespace detail {
 
         CompoundType(): arity(0) {};
         ~CompoundType() {
-            for(struct _Base* ptr: value_ptr_vec) {
+            for(class _Base* ptr: value_ptr_vec) {
                 delete ptr;
             }
 
@@ -203,14 +203,14 @@ namespace detail {
 
     protected:
         int arity;
-        std::vector<struct _Base*> value_ptr_vec;
+        std::vector<class _Base*> value_ptr_vec;
     };
 
 
     template <typename T>
     class SoleTypeListType: public CompoundType<ei_decode_list_header, T> {
     public:
-        typedef std::vector<struct _Base*>::iterator IterType;
+        typedef std::vector<class _Base*>::iterator IterType;
 
         struct Iterator: public std::iterator<std::forward_iterator_tag, IterType> {
             IterType iter;
@@ -385,7 +385,7 @@ public:
     EIDecoder(EIDecoder&&) = delete;
 
     virtual ~EIDecoder() {
-        for(struct detail::_Base* ptr: value_ptrs_) {
+        for(class detail::_Base* ptr: value_ptrs_) {
             delete ptr;
         }
     }
@@ -422,7 +422,7 @@ private:
     int version_;
     int ret_;
     const char* buf_;
-    std::vector<struct detail::_Base*> value_ptrs_;
+    std::vector<class detail::_Base*> value_ptrs_;
 
 };
 
