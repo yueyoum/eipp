@@ -10,13 +10,21 @@ e.g. Write c++ driver for erlang, or encode/decode [External Term Format][1]
                                                    
 The library **ONLY** support the following types:
 
-*   long. (include char, short, int, long)
+*   long: (include char, short, int, long)
+    *   `eipp::Long`
 *   double. (include float, double)
+    *   `eipp::Double`
 *   string. (byte sequence, byte in 0-255)
+    *   `eipp::String`
 *   binary. (byte sequence, any bytes)
+    *   `eipp::Binary`
 *   list. (different or same type elements, any type supported here)
+    *   `eipp::List<T>`: elements are all of type T
+    *   `eipp::MultiTypeList<T1, T2...>`: elements with different types
 *   tuple. (some elements, any type supported here)
+    *   `eipp::Tuple<T1, T2...>`
 *   map. (one key type, one value type. any type supported here)
+    *   `eipp::Map<KeyType, ValueType>`
 
 
 ## Decode Example
@@ -71,8 +79,8 @@ std::cout << typeid(v3).name() << ", " << v3 << std::endl;
 std::cout << typeid(v4).name() << ", " << v4 << std::endl;
 
 // outout
-// Pc, v1string
-// Pc, v2binary
+// NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE, v1string
+// NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE, v2binary
 // l, 222
 // d, 1.23
 ```
@@ -105,15 +113,15 @@ for (size_t i = 0; i < result->size(); i++) {
 }
 
 // output
-// Pc, Jack
+// NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE, Jack
 // l, 22
-// Pc, Jim
+// NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE, Jim
 // l, 30
-// Pc, Zoe
+// NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE, Zoe
 // l, 28
-// Pc, John
+// NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE, John
 // l, 40
-// Pc, Steve
+// NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE, Steve
 // l, 11
 ```
 
@@ -150,20 +158,74 @@ for(auto& iter: result->value) {
 // l, 1
 //     l, 1
 //     l, 100
-//     Pc, One
+//     NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE, One
 // l, 2
 //     l, 2
 //     l, 200
-//     Pc, Two
+//     NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE, Two
 // l, 3
 //     l, 3
 //     l, 300
-//     Pc, Three
+//     NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE, Three
+```
+
+#### decode a MultiTypeList
+```erlang
+%% Erlang
+Value = [555, {1,2,"case5"}, #{100 => {101, 102, "some string!"}}].
+Data = term_to_binary(Value).
+```
+
+```cpp
+using T = eipp::Tuple<eipp::Long, eipp::Long, eipp::String>;
+using T1 = eipp::Map<eipp::Long, T>;
+using T2 = eipp::MultiTypeList<eipp::Long, T, T1>;
+
+eipp::EIDecoder decoder(content);
+auto result = decoder.parse<T2>();
+if(!decoder.is_valid()) {
+    return -1;
+}
+
+auto v1 = result->get<0>();
+auto v2 = result->get<1>();
+auto v3 = result->get<2>();
+
+std::cout << v1 << std::endl;
+
+auto tv1 = v2->get<0>();
+auto tv2 = v2->get<1>();
+auto tv3 = v2->get<2>();
+
+std::cout << tv1 << std::endl;
+std::cout << tv2 << std::endl;
+std::cout << tv3 << std::endl;
+
+for(auto& iter: *v3) {
+    std::cout << typeid(iter.first).name() << ", " << iter.first << std::endl;
+    auto tuple = iter.second;
+    auto mv1 = tuple->get<0>();
+    auto mv2 = tuple->get<1>();
+    auto mv3 = tuple->get<2>();
+
+    std::cout << "    " << typeid(mv1).name() << ", " << mv1 << std::endl;
+    std::cout << "    " << typeid(mv2).name() << ", " << mv2 << std::endl;
+    std::cout << "    " << typeid(mv3).name() << ", " << mv3 << std::endl;
+}
+
+// output
+// 555
+// 1
+// 2
+// case5
+// l, 100
+//     l, 101
+//     l, 102
+//     NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE, some string!
 ```
 
 ## TODO
-1.  implement custom iterator
-2.  EIEncoder
+1.  EIEncoder
 
 
 [1]: http://erlang.org/doc/apps/erts/erl_ext_dist.html
