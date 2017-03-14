@@ -1,6 +1,7 @@
 #ifndef EIPP_H
 #define EIPP_H
 
+#include <string>
 #include <vector>
 #include <map>
 #include <type_traits>
@@ -46,16 +47,17 @@ namespace detail {
     template <typename Decoder>
     struct SingleTypeWithCharBuf: _Base {
         static const bool is_single = true;
-        typedef char * value_type;
-        char * value;
+        typedef std::string value_type;
+        char * char_ptr_value;
         int len;
+        std::string value;
 
         SingleTypeWithCharBuf() {
             len = 0;
         }
 
         ~SingleTypeWithCharBuf() {
-            delete[] value;
+            delete[] char_ptr_value;
         }
 
         int decode(const char* buf, int* index) override {
@@ -79,8 +81,12 @@ namespace detail {
             ret = ei_get_type(buf, index, &tp, &(s->len));
             if(ret == -1) return ret;
 
-            s->value = new char[s->len+1]{'\0'};
-            return ei_decode_string(buf, index, s->value);
+            s->char_ptr_value = new char[s->len+1]();
+            ret = ei_decode_string(buf, index, s->char_ptr_value);
+            if(ret == -1) return ret;
+
+            s->value = std::string(s->char_ptr_value, (unsigned long)s->len);
+            return ret;
         }
     };
 
@@ -90,8 +96,12 @@ namespace detail {
             ret = ei_get_type(buf, index, &tp, &(s->len));
             if(ret == -1) return ret;
 
-            s->value = new char[s->len+1]{'\0'};
-            return ei_decode_binary(buf, index, s->value, (long *)&(s->len));
+            s->char_ptr_value = new char[s->len+1]();
+            ret = ei_decode_binary(buf, index, s->char_ptr_value, (long *)&(s->len));
+            if(ret == -1) return ret;
+
+            s->value = std::string(s->char_ptr_value, (unsigned long)s->len);
+            return ret;
         }
     };
 
@@ -142,11 +152,6 @@ namespace detail {
             return value_ptr_vec.size();
         }
 
-        // get<N>();
-        // mostly used for get value of known struct tuple
-        // or used for known length small list which contains different type elements
-        // e.g. eipp::Tuple<eipp::Long, eipp::Double>
-        // e.g. eipp::List<eipp::Long, eipp::Tuple<...>>
         template <int index,
                 typename = typename std::enable_if<TypeByIndex<index, T, Types...>::type::is_single>::type
                         >

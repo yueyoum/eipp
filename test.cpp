@@ -75,11 +75,11 @@ int test_case2() {
     std::cout << typeid(v3).name() << ", " << v3 << std::endl;
     std::cout << typeid(v4).name() << ", " << v4 << std::endl;
 
-    if(strncmp(v1, "v1string", 8)) {
+    if(v1 != "v1string") {
         return -2;
     }
 
-    if(strncmp(v2, "v2binary", 8)) {
+    if(v2 != "v2binary") {
         return -2;
     }
 
