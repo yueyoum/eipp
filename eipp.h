@@ -33,9 +33,7 @@ namespace detail {
         static const bool is_single = true;
         typedef T value_type;
 
-        SingleType() {
-            value = T();
-        }
+        SingleType(): value(T()) {}
 
         ~SingleType() {
         }
@@ -60,9 +58,7 @@ namespace detail {
         static const bool is_single = true;
         typedef std::string value_type;
 
-        SingleTypeWithCharBuf() {
-            len = 0;
-        }
+        SingleTypeWithCharBuf(): len(0) {}
 
         ~SingleTypeWithCharBuf() {
             delete[] char_ptr_value;
@@ -368,10 +364,11 @@ using Binary = detail::SingleTypeWithCharBuf<detail::BinaryDecoder>;
 template <typename ... Types>
 using Tuple = detail::CompoundType<ei_decode_tuple_header, Types...>;
 
-//template <typename ... Types>
-//using List = detail::CompoundType<ei_decode_list_header, Types...>;
 template <typename T>
 using List = detail::SoleTypeListType<T>;
+
+template <typename ... Types>
+using MultiTypeList = detail::CompoundType<ei_decode_list_header, Types...>;
 
 template <typename KT, typename VT>
 using Map = detail::MapType<KT, VT>;
