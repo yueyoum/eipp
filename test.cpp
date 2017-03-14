@@ -110,9 +110,8 @@ int test_case3() {
         return -1;
     }
 
-    for (size_t i = 0; i < result->size(); i++) {
-        auto tuple = result->get<>(i);
 
+    for(auto tuple: *result) {
         auto v1 = tuple->get<0>();
         auto v2 = tuple->get<1>();
 
@@ -175,54 +174,6 @@ int main() {
             return -2;
         }
     }
-
-
-
-
-//    typedef eipp::Tuple<eipp::Long, eipp::Double> T;
-////    typedef eipp::List<T> T1;
-//
-//    typedef eipp::detail::MapType<eipp::Long , T> MT;
-//
-//    auto m = encoder.parse<MT>();
-//    if(!encoder.is_valid()) {
-//        std::cout << "not valid!" << std::endl;
-//        delete[] content;
-//        return -1;
-//    }
-//
-//    for(auto& iter: m->value) {
-//        std::cout << iter.first << std::endl;
-//        std::cout << iter.second->get<0>() << std::endl;
-//        std::cout << iter.second->get<1>() << std::endl;
-//    }
-//
-
-//    auto v1 = encoder.parse<T1>();
-//    std::cout << "decode done" << std::endl;
-//    if(!encoder.is_valid()) {
-//        std::cout << "not valid!" << std::endl;
-//        delete[] content;
-//        return -1;
-//    }
-//
-//    std::cout << "size: " << v1->size() << std::endl;
-//
-//    for(int i=0; i<v1->size(); i++) {
-//        auto x = v1->get<>(i);
-//        auto x1 = x->get<0>();
-//        auto x2 = x->get<1>();
-//
-//        std::cout << typeid(x1).name() << ", " << x1 << std::endl;
-//        std::cout << typeid(x2).name() << ", " << x2 << std::endl;
-//
-//    }
-
-//    auto x = encoder.parse<eipp::Binary>();
-//    std::cout << encoder.is_valid() << std::endl;
-//    std::cout << typeid(x).name() << std::endl;
-//    std::cout << x << std::endl;
-//
 
     return 0;
 

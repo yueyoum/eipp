@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <type_traits>
+#include <iterator>
 #include <ei.h>
 
 namespace eipp {
@@ -160,20 +161,6 @@ namespace detail {
             return dynamic_cast<typename TypeByIndex<index, T, Types...>::type*>(value_ptr_vec[index]);
         };
 
-        // get<>(N);
-        // only used for list which contains SAME type elements
-        // e.g. eipp::List<eipp::Long>
-        // e.g. eipp::List<eipp::Tuple<...>>
-        template <typename T1=T, typename = typename std::enable_if<std::is_same<T1, T>::value && T1::is_single>::type>
-        typename T1::value_type get(int index) {
-            return dynamic_cast<T1*>(value_ptr_vec[index])->value;
-        }
-
-        template <typename T1=T, typename = typename std::enable_if<std::is_same<T1, T>::value && !T1::is_single>::type>
-        T1* get(int index) {
-            return dynamic_cast<T1*>(value_ptr_vec[index]);
-        }
-
         int decode(const char* buf, int* index) override {
             int ret = 0;
             ret = _decode_header_func(buf, index, &arity);
@@ -192,9 +179,64 @@ namespace detail {
                 }
             }
         }
-
     };
 
+
+    template <typename T>
+    struct SoleTypeListType: public CompoundType<ei_decode_list_header, T> {
+        typedef std::vector<struct _Base*>::iterator IterType;
+
+        struct Iterator: public std::iterator<std::forward_iterator_tag, IterType> {
+            IterType iter;
+            Iterator(IterType i): iter(i) {}
+            Iterator(const Iterator& rhs): iter(rhs.iter) {}
+            Iterator&operator = (const Iterator& rhs) {
+                iter = rhs.iter;
+                return *this;
+            }
+
+            Iterator operator ++ () {
+                ++iter;
+                return *this;
+            }
+
+            Iterator operator ++ (int) {
+                Iterator tmp = *this;
+                ++iter;
+                return tmp;
+            }
+
+            bool operator == (const Iterator& rhs) {
+                return iter == rhs.iter;
+            }
+
+            bool operator != (const Iterator& rhs) {
+                return iter != rhs.iter;
+            }
+
+            template <typename X=T>
+            typename std::enable_if<X::is_single, typename X::value_type>::type
+            operator *() {
+                return dynamic_cast<X*>(*iter)->value;
+            }
+
+            template <typename X=T>
+            typename std::enable_if<!X::is_single, X*>::type
+            operator *() {
+                return dynamic_cast<X*>(*iter);
+            }
+
+        };
+
+        typedef Iterator iterator;
+        iterator begin() {
+            return Iterator(this->value_ptr_vec.begin());
+        }
+
+        iterator end() {
+            return Iterator(this->value_ptr_vec.end());
+        }
+    };
 
     template <typename KT, typename VT,
             typename = typename std::enable_if<
@@ -289,8 +331,10 @@ using Binary = detail::SingleTypeWithCharBuf<detail::BinaryDecoder>;
 template <typename ... Types>
 using Tuple = detail::CompoundType<ei_decode_tuple_header, Types...>;
 
-template <typename ... Types>
-using List = detail::CompoundType<ei_decode_list_header, Types...>;
+//template <typename ... Types>
+//using List = detail::CompoundType<ei_decode_list_header, Types...>;
+template <typename T>
+using List = detail::SoleTypeListType<T>;
 
 template <typename KT, typename VT>
 using Map = detail::MapType<KT, VT>;
@@ -316,11 +360,10 @@ public:
         return ret_ == 0;
     }
 
-    template <typename T,
-            typename = typename std::enable_if<
-                    std::is_base_of<detail::_Base, T>::value && T::is_single
-            >::type>
-    typename T::value_type parse() {
+
+    template <typename T>
+    typename std::enable_if<std::is_base_of<detail::_Base, T>::value && T::is_single, typename T::value_type>::type
+    parse() {
         detail::_Base* t = new T();
         ret_ = t->decode(buf_, &index_);
 
@@ -328,11 +371,10 @@ public:
         return dynamic_cast<T*>(t)->value;
     }
 
-    template <typename T,
-            typename = typename std::enable_if<
-                    std::is_base_of<detail::_Base, T>::value && !T::is_single
-            >::type>
-    T* parse() {
+
+    template <typename T>
+    typename std::enable_if<std::is_base_of<detail::_Base, T>::value && !T::is_single, T*>::type
+    parse() {
         detail::_Base* t = new T();
         ret_ = t->decode(buf_, &index_);
 

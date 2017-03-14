@@ -5,6 +5,7 @@
 CMakeLists.txt
 cmake-build-debug
 test
+build.sh
 
 # IntelliJ project files
 .idea
