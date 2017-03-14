@@ -102,9 +102,7 @@ if(!decoder.is_valid()) {
     return -1;
 }
 
-for (size_t i = 0; i < result->size(); i++) {
-    auto tuple = result->get<>(i);
-
+for(auto tuple: *result) {
     auto v1 = tuple->get<0>();
     auto v2 = tuple->get<1>();
 
@@ -142,7 +140,7 @@ if(!decoder.is_valid()) {
     return -1;
 }
 
-for(auto& iter: result->value) {
+for(auto& iter: *result) {
     std::cout << typeid(iter.first).name() << ", " << iter.first << std::endl;
     auto tuple = iter.second;
     auto v1 = tuple->get<0>();
