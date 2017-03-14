@@ -21,16 +21,17 @@ namespace detail {
         typedef Head type;
     };
 
-    struct _Base {
+    class _Base {
+    public:
         virtual ~_Base(){}
         virtual int decode(const char* buf, int* index) = 0;
     };
 
     template <typename T, typename Decoder>
-    struct SingleType: _Base {
+    class SingleType: public _Base {
+    public:
         static const bool is_single = true;
         typedef T value_type;
-        T value;
 
         SingleType() {
             value = T();
@@ -39,18 +40,25 @@ namespace detail {
         ~SingleType() {
         }
 
+        T& get_value() {
+            return value;
+        }
+
         int decode(const char* buf, int* index) override {
             return Decoder()(buf, index, this);
         }
+
+    private:
+        friend class LongDecoder;
+        friend class DoubleDecoder;
+        T value;
     };
 
     template <typename Decoder>
-    struct SingleTypeWithCharBuf: _Base {
+    struct SingleTypeWithCharBuf: public _Base {
+    public:
         static const bool is_single = true;
         typedef std::string value_type;
-        char * char_ptr_value;
-        int len;
-        std::string value;
 
         SingleTypeWithCharBuf() {
             len = 0;
@@ -60,20 +68,33 @@ namespace detail {
             delete[] char_ptr_value;
         }
 
+        std::string& get_value() {
+            return value;
+        }
+
         int decode(const char* buf, int* index) override {
             return Decoder()(buf, index, this);
         }
+
+    private:
+        friend class StringDecoder;
+        friend class BinaryDecoder;
+        char * char_ptr_value;
+        int len;
+        std::string value;
     };
 
-    template <typename T, int(*_decode_func)(const char*, int*, T*)>
-    struct SimpleDecoder {
-        int operator ()(const char* buf, int* index, SingleType<T, SimpleDecoder<T, _decode_func>>* s) {
-            return _decode_func(buf, index, &(s->value));
+    struct LongDecoder {
+        int operator ()(const char* buf, int* index, SingleType<long, LongDecoder>* s) {
+            return ei_decode_long(buf, index, &(s->value));
         }
     };
 
-    using LongDecoder = SimpleDecoder<long, ei_decode_long>;
-    using DoubleDecoder = SimpleDecoder<double, ei_decode_double>;
+    struct DoubleDecoder {
+        int operator ()(const char* buf, int* index, SingleType<double, DoubleDecoder>* s) {
+            return ei_decode_double(buf, index, &(s->value));
+        }
+    };
 
     struct StringDecoder {
         int operator ()(const char* buf, int* index, SingleTypeWithCharBuf<StringDecoder>* s) {
@@ -133,11 +154,10 @@ namespace detail {
     }
 
     template <int(*_decode_header_func)(const char*, int*, int*), typename T, typename ... Types>
-    struct CompoundType: _Base {
+    class CompoundType: public _Base {
+    public:
         static const bool is_single = false;
         typedef void value_type;    // not use, but should be here for std::conditional;
-        int arity;
-        std::vector<struct _Base*> value_ptr_vec;
 
         CompoundType(): arity(0) {};
         ~CompoundType() {
@@ -156,7 +176,7 @@ namespace detail {
                 typename = typename std::enable_if<TypeByIndex<index, T, Types...>::type::is_single>::type
                         >
         typename  TypeByIndex<index, T, Types...>::type::value_type get() {
-            return dynamic_cast<typename TypeByIndex<index, T, Types...>::type*>(value_ptr_vec[index])->value;
+            return dynamic_cast<typename TypeByIndex<index, T, Types...>::type*>(value_ptr_vec[index])->get_value();
         };
 
         template <int index,
@@ -184,11 +204,16 @@ namespace detail {
                 }
             }
         }
+
+    protected:
+        int arity;
+        std::vector<struct _Base*> value_ptr_vec;
     };
 
 
     template <typename T>
-    struct SoleTypeListType: public CompoundType<ei_decode_list_header, T> {
+    class SoleTypeListType: public CompoundType<ei_decode_list_header, T> {
+    public:
         typedef std::vector<struct _Base*>::iterator IterType;
 
         struct Iterator: public std::iterator<std::forward_iterator_tag, IterType> {
@@ -222,7 +247,7 @@ namespace detail {
             template <typename X=T>
             typename std::enable_if<X::is_single, typename X::value_type>::type
             operator *() {
-                return dynamic_cast<X*>(*iter)->value;
+                return dynamic_cast<X*>(*iter)->get_value();
             }
 
             template <typename X=T>
@@ -247,16 +272,13 @@ namespace detail {
             typename = typename std::enable_if<
                     std::is_base_of<_Base, KT>::value && std::is_base_of<_Base, VT>::value>::type
     >
-    struct MapType: _Base {
+    class MapType: public _Base {
+    public:
         static const bool is_single = false;
         typedef void value_type;    // not use, but should be here for std::conditional;
-        int arity;
 
         using KeyType = typename std::conditional<KT::is_single, typename KT::value_type, KT*>::type;
         using ValueType = typename std::conditional<VT::is_single, typename VT::value_type, VT*>::type;
-
-        std::map<KeyType, ValueType> value;
-        std::vector<_Base*> value_ptr_vec;
 
         typedef typename std::map<KeyType, ValueType>::iterator iterator;
 
@@ -294,43 +316,43 @@ namespace detail {
 
                 value_ptr_vec.push_back(k);
                 value_ptr_vec.push_back(v);
-                _add_to_value<>(k, v);
+                add_to_value(k, v);
             }
 
             return ret;
         }
 
-        template <typename Kt = KT, typename Vt = VT,
-                typename = typename std::enable_if<Kt::is_single && Vt::is_single>::type
-                        >
-        void _add_to_value(KT* k, VT* v) {
-            value[k->value] = v->value;
-        }
+    private:
+        int arity;
+        std::map<KeyType, ValueType> value;
+        std::vector<_Base*> value_ptr_vec;
 
-        template <typename Kt = KT, typename Vt = VT,
-                typename = typename std::enable_if<Kt::is_single && !Vt::is_single>::type
-        >
-        Vt* _add_to_value(KT* k, VT* v) {
-            value[k->value] = v;
-            return v;
-        }
-
-        template <typename Kt = KT, typename Vt = VT,
-                typename = typename std::enable_if<!Kt::is_single && Vt::is_single>::type
-        >
-        Kt* _add_to_value(KT* k, VT* v) {
-            value[k] = v->value;
-            return k;
-        }
-
-        template <typename Kt = KT, typename Vt = VT,
-                typename = typename std::enable_if<!Kt::is_single && !Vt::is_single>::type
-        >
-        int _add_to_value(KT* k, VT* v) {
-            value[k->value] = v->value;
+        template <typename Kt = KT, typename Vt = VT>
+        typename std::enable_if<Kt::is_single && Vt::is_single, int>::type
+        add_to_value(KT* k, VT* v) {
+            value[k->get_value()] = v->get_value();
             return 0;
         }
 
+        template <typename Kt = KT, typename Vt = VT>
+        typename std::enable_if<Kt::is_single && !Vt::is_single, Vt*>::type
+        add_to_value(KT* k, VT* v) {
+            value[k->get_value()] = v;
+            return v;
+        }
+
+        template <typename Kt = KT, typename Vt = VT>
+        typename std::enable_if<!Kt::is_single && Vt::is_single, Kt*>::type
+        add_to_value(KT* k, VT* v) {
+            value[k] = v->get_value();
+            return k;
+        }
+
+        template <typename Kt = KT, typename Vt = VT>
+        typename std::enable_if<!Kt::is_single && !Vt::is_single, void>::type
+        add_to_value(KT* k, VT* v) {
+            value[k->get_value()] = v->get_value();
+        }
     };
 
 }
@@ -383,7 +405,7 @@ public:
         ret_ = t->decode(buf_, &index_);
 
         compound_ptrs_.push_back(t);
-        return dynamic_cast<T*>(t)->value;
+        return dynamic_cast<T*>(t)->get_value();
     }
 
 
