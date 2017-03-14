@@ -137,7 +137,7 @@ int test_case4() {
         return -1;
     }
 
-    for(auto& iter: result->value) {
+    for(auto& iter: *result) {
         std::cout << typeid(iter.first).name() << ", " << iter.first << std::endl;
         auto tuple = iter.second;
         auto v1 = tuple->get<0>();

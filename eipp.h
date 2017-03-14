@@ -258,6 +258,8 @@ namespace detail {
         std::map<KeyType, ValueType> value;
         std::vector<_Base*> value_ptr_vec;
 
+        typedef typename std::map<KeyType, ValueType>::iterator iterator;
+
         MapType(): arity(0) {}
         ~MapType() {
             for(_Base* ptr: value_ptr_vec) {
@@ -266,6 +268,14 @@ namespace detail {
 
             value.clear();
             value_ptr_vec.clear();
+        }
+
+        iterator begin() {
+            return value.begin();
+        }
+
+        iterator end() {
+            return value.end();
         }
 
         int decode(const char* buf, int* index) override {
