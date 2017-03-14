@@ -347,7 +347,7 @@ namespace detail {
         template <typename Kt = KT, typename Vt = VT>
         typename std::enable_if<!Kt::is_single && !Vt::is_single, void>::type
         add_to_value(KT* k, VT* v) {
-            value[k->get_value()] = v->get_value();
+            value[k] = v;
         }
     };
 
@@ -385,7 +385,7 @@ public:
     EIDecoder(EIDecoder&&) = delete;
 
     virtual ~EIDecoder() {
-        for(struct detail::_Base* ptr: compound_ptrs_) {
+        for(struct detail::_Base* ptr: value_ptrs_) {
             delete ptr;
         }
     }
@@ -401,7 +401,7 @@ public:
         detail::_Base* t = new T();
         ret_ = t->decode(buf_, &index_);
 
-        compound_ptrs_.push_back(t);
+        value_ptrs_.push_back(t);
         return dynamic_cast<T*>(t)->get_value();
     }
 
@@ -412,7 +412,7 @@ public:
         detail::_Base* t = new T();
         ret_ = t->decode(buf_, &index_);
 
-        compound_ptrs_.push_back(t);
+        value_ptrs_.push_back(t);
         return dynamic_cast<T*>(t);
     }
 
@@ -422,7 +422,7 @@ private:
     int version_;
     int ret_;
     const char* buf_;
-    std::vector<struct detail::_Base*> compound_ptrs_;
+    std::vector<struct detail::_Base*> value_ptrs_;
 
 };
 
