@@ -168,18 +168,16 @@ namespace detail {
             return value_ptr_vec.size();
         }
 
-        template <int index,
-                typename = typename std::enable_if<TypeByIndex<index, T, Types...>::type::is_single>::type
-                        >
-        typename  TypeByIndex<index, T, Types...>::type::value_type get() {
-            return dynamic_cast<typename TypeByIndex<index, T, Types...>::type*>(value_ptr_vec[index])->get_value();
+        template <int index, typename ThisType = typename TypeByIndex<index, T, Types...>::type>
+        typename std::enable_if<ThisType::is_single, typename ThisType::value_type>::type
+        get() {
+            return dynamic_cast<ThisType*>(value_ptr_vec[index])->get_value();
         };
 
-        template <int index,
-                typename = typename std::enable_if<!TypeByIndex<index, T, Types...>::type::is_single>::type
-        >
-        typename  TypeByIndex<index, T, Types...>::type* get() {
-            return dynamic_cast<typename TypeByIndex<index, T, Types...>::type*>(value_ptr_vec[index]);
+        template <int index, typename ThisType = typename TypeByIndex<index, T, Types...>::type>
+        typename std::enable_if<!ThisType::is_single, ThisType*>::type
+        get() {
+            return dynamic_cast<ThisType*>(value_ptr_vec[index]);
         };
 
         int decode(const char* buf, int* index) override {
