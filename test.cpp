@@ -240,6 +240,29 @@ int main() {
         }
     }
 
+//    int number;
+//    std::cin >> number;
+//    std::cout << "number is: " << number << std::endl;
+
+
+//    char *s1 = "Hello";
+//    std::string s2("World!");
+//
+//    eipp::EIEncoder en;
+//    en.start_encode_list();
+//    en.encode(10);
+//    en.encode(29LL);
+//    en.encode(s1, eipp::TYPE::Binary);
+//    en.encode(s2, eipp::TYPE::Binary);
+//    en.end_encode_list();
+//
+//    std::cout << "encode done" << std::endl;
+//
+//    auto s = en.get_data();
+//    std::ofstream f("/tmp/eippout");
+//    f << s;
+//    f.close();
+
     return 0;
 
 }
