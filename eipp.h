@@ -106,14 +106,15 @@ namespace detail {
         }
     };
 
-    struct StringDecoder {
+    template <int(*decode_func)(const char*, int*, char *)>
+    struct StringDecoderImpl {
         int operator ()(const char* buf, int* index, std::string& value) {
             int tp=0, len=0, ret=0;
             ret = ei_get_type(buf, index, &tp, &len);
             if(ret == -1) return ret;
 
             char* ptr = new char[len+1]();
-            ret = ei_decode_string(buf, index, ptr);
+            ret = decode_func(buf, index, ptr);
             if(ret == -1) return ret;
 
             value = std::string(ptr, (unsigned long)len);
@@ -121,6 +122,9 @@ namespace detail {
             return ret;
         }
     };
+
+    using StringDecoder = StringDecoderImpl<ei_decode_string>;
+    using AtomDecoder = StringDecoderImpl<ei_decode_atom>;
 
     struct BinaryDecoder {
         int operator ()(const char* buf, int* index, std::string& value) {
@@ -228,7 +232,6 @@ namespace detail {
     protected:
         int arity;
         std::vector<class _Base*> value_ptr_vec;
-//        std::tuple<T, Types...> encode_value_tuple_;
     };
 
 
@@ -419,6 +422,7 @@ namespace detail {
 using Long = detail::SingleType<TYPE::Integer, long, detail::LongDecoder>;
 using Double = detail::SingleType<TYPE::Float, double, detail::DoubleDecoder>;
 using String = detail::SingleType<TYPE::String, std::string, detail::StringDecoder>;
+using Atom = detail::SingleType<TYPE::Atom, std::string, detail::AtomDecoder>;
 using Binary = detail::SingleType<TYPE::Binary, std::string, detail::BinaryDecoder>;
 
 

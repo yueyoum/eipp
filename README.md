@@ -88,12 +88,12 @@ std::cout << typeid(v4).name() << ", " << v4 << std::endl;
 #### decode a list which contains unknown size elements. elements are same type
 ```erlang
 %% Erlang
-Value = [{"Jack", 22}, {"Jim", 30}, {"Zoe", 28}, {"John", 40}, {"Steve", 11}].
+Value = [{jack, 22}, {jim, 30}, {zoe, 28}, {john, 40}, {steve, 11}].
 Data = term_to_binary(Value).
 ```
 
 ```cpp
-using T = eipp::Tuple<eipp::String, eipp::Long>;
+using T = eipp::Tuple<eipp::Atom, eipp::Long>;
 using T1 = eipp::List<T>;
 
 eipp::EIDecoder decoder(buf);

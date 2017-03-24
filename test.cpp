@@ -104,7 +104,7 @@ int test_case3() {
     ContentLoader cl("./test_data/case3");
     auto content = cl.get_buf();
 
-    using T = eipp::Tuple<eipp::String, eipp::Long>;
+    using T = eipp::Tuple<eipp::Atom, eipp::Long>;
     using T1 = eipp::List<T>;
 
     eipp::EIDecoder decoder(content);
