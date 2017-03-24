@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <list>
+#include <deque>
 #include <map>
 #include <stack>
 #include <tuple>
@@ -13,6 +14,9 @@
 #include <ei.h>
 
 namespace eipp {
+
+class EIEncoder;
+class EIDecoder;
 
 enum class TYPE {
     Integer,
@@ -52,32 +56,38 @@ namespace detail {
         typedef T value_type;
 
         SingleType(): value(T()) {}
-//        SingleType(const T& v): value(v) {}
-//        SingleType(T&& v): value(std::move(v)) {}
-//
-//        SingleType(const self_type& rhs) {
-//            value = rhs.value;
-//            std::cout << static_cast<std::underlying_type<TYPE>::type>(tp) << " Copy Constructor" << std::endl;
-//        }
-//
-//        SingleType(self_type&& rhs) {
-//            value = std::move(rhs.value);
-//            std::cout << static_cast<std::underlying_type<TYPE>::type>(tp) << " Move Constructor" << std::endl;
-//        }
-//
-//        SingleType&operator = (const self_type& rhs) {
-//            value = rhs.value;
-//            std::cout << static_cast<std::underlying_type<TYPE>::type>(tp) << " Assign Constructor" << std::endl;
-//            return *this;
-//        }
-//
-//        SingleType&operator = (self_type&& rhs) {
-//            value = std::move(rhs.value);
-//            std::cout << static_cast<std::underlying_type<TYPE>::type>(tp) << " Assign Move Constructor" << std::endl;
-//            return *this;
-//        }
+        SingleType(const T& v): value(v) {}
+        SingleType(T&& v): value(std::move(v)) {}
+
+        SingleType&operator = (const T& v) {
+            value = v;
+            return *this;
+        }
+
+        SingleType&operator = (T&& v) {
+            value = std::move(v);
+            return *this;
+        }
+
+        SingleType(const self_type& rhs): value(rhs.value) {}
+        SingleType(self_type&& rhs): value(std::move(rhs.value)) {}
+
+        SingleType&operator = (const self_type& rhs) {
+            value = rhs.value;
+            return *this;
+        }
+
+        SingleType&operator = (self_type&& rhs) {
+            value = std::move(rhs.value);
+            return *this;
+        }
 
         ~SingleType() {
+        }
+
+        // used for map key
+        bool operator< (const self_type& rhs) const {
+            return value < rhs.value;
         }
 
         T& get_value() {
@@ -89,6 +99,7 @@ namespace detail {
         }
 
     private:
+        friend class ::eipp::EIEncoder;
         T value;
     };
 
@@ -174,22 +185,9 @@ namespace detail {
         static const TYPE category_type = tp;
         static const bool is_single = false;
         typedef CompoundType<tp, _decode_header_func, T, Types...> self_type;
-        typedef void value_type;    // not use, but should be here for std::conditional;
+        typedef self_type* value_type;    // not use, but should be here for std::conditional;
 
         CompoundType(): arity(0) {}
-
-//        CompoundType(const self_type& rhs) {
-//            arity = rhs.arity;
-//            value_ptr_vec = rhs.value_ptr_vec;
-//            encode_value_tuple_ = rhs.encode_value_tuple_;
-//        }
-//
-//        CompoundType&operator = (const self_type& rhs) {
-//            arity = rhs.arity;
-//            value_ptr_vec = rhs.value_ptr_vec;
-//            encode_value_tuple_ = rhs.encode_value_tuple_;
-//            return *this;
-//        }
 
         ~CompoundType() {
             for(class _Base* ptr: value_ptr_vec) {
@@ -299,7 +297,8 @@ namespace detail {
     public:
         static const TYPE category_type = TYPE::Map;
         static const bool is_single = false;
-        typedef void value_type;    // not use, but should be here for std::conditional;
+        typedef MapType<KT, VT> self_type;
+        typedef self_type* value_type;    // not use, but should be here for std::conditional;
 
         using KeyType = typename std::conditional<KT::is_single, typename KT::value_type, KT*>::type;
         using ValueType = typename std::conditional<VT::is_single, typename VT::value_type, VT*>::type;
@@ -415,6 +414,25 @@ namespace detail {
     template <typename T>
     struct is_list<std::list<T>>: std::true_type{};
 
+    template <typename T>
+    struct is_vector: std::false_type{};
+
+    template <typename T>
+    struct is_vector<std::vector<T>>: std::true_type{};
+
+    template <typename T>
+    struct is_deque: std::false_type{};
+
+    template <typename T>
+    struct is_deque<std::deque<T>>: std::true_type{};
+
+    template <typename T, typename = void>
+    struct is_sequence_container: std::false_type{};
+
+    template <typename T>
+    struct is_sequence_container<T,
+            typename std::enable_if<is_list<T>::value || is_vector<T>::value || is_deque<T>::value>::type
+    >: std::true_type{};
 }
 
 // simple type
@@ -508,13 +526,16 @@ public:
         }
     }
 
-    // list
+    // list, vector, deque
     template <typename T>
-    typename std::enable_if<detail::is_list<T>::value>::type
+    typename std::enable_if<detail::is_sequence_container<T>::value>::type
     encode(const T& arg) {
-        std::cout << "encode list" << std::endl;
-
         auto arity = arg.size();
+        if(arity == 0) {
+            ei_x_encode_empty_list(current_buff());
+            return;
+        }
+
         auto header_func = [&arity](ei_x_buff* this_buff) {
             ei_x_encode_list_header(this_buff, arity);
         };
@@ -532,15 +553,16 @@ public:
     template <typename T>
     typename std::enable_if<std::tuple_size<T>::value >= 0 >::type
     encode(const T& arg) {
-        std::cout << "encode tuple" << std::endl;
         constexpr size_t arity = std::tuple_size<T>::value;
+        if(arity == 0) {
+            ei_x_encode_tuple_header(current_buff(), 0);
+        }
 
         auto header_func = [&arity](ei_x_buff* this_buff) {
             ei_x_encode_tuple_header(this_buff, arity);
         };
 
         CompoundEncoder en(this, header_func);
-
         TupleEncoderHelper<arity, T>::encode(this, arg);
     }
 
@@ -549,9 +571,12 @@ public:
     typename std::enable_if<
             std::is_same<typename T::value_type, std::pair<const typename T::key_type, typename T::mapped_type>>::value>::type
     encode(const T& arg) {
-        std::cout << "encode map" << std::endl;
-
         auto arity = arg.size();
+        if(arity == 0) {
+            ei_x_encode_map_header(current_buff(), 0);
+            return;
+        }
+
         auto header_func = [&arity](ei_x_buff* this_buff) {
             ei_x_encode_map_header(this_buff, arity);
         };
@@ -564,44 +589,53 @@ public:
         }
     };
 
+    // integral
     template <typename T>
-    typename std::enable_if<std::is_integral<T>::value &&
-            ! detail::is_one_of<T, long long, unsigned long long>::value>::type
+    typename std::enable_if<std::is_integral<T>::value>::type
     encode(const T& arg) {
         ei_x_encode_long(current_buff(), (long)arg);
     }
 
-    template <typename T>
-    typename std::enable_if<detail::is_one_of<T, long long, unsigned long long>::value>::type
-    encode(const T& arg) {
-        ei_x_encode_longlong(current_buff(), (long long)arg);
-    };
-
+    // double
     template <typename T>
     typename std::enable_if<std::is_floating_point<T>::value>::type
     encode(const T& arg) {
         ei_x_encode_double(current_buff(), (double)arg);
     }
 
+    // atom
+    template <typename T>
+    typename std::enable_if<std::is_base_of<detail::_Base, T>::value && T::category_type == TYPE::Atom>::type
+    encode(const T& arg) {
+//        auto& value = arg.get_value();
+        ei_x_encode_atom_len(current_buff(), arg.value.c_str(), (int)arg.value.length());
+    };
+
+    // binary
+    template <typename T>
+    typename std::enable_if<std::is_base_of<detail::_Base, T>::value && T::category_type == TYPE::Binary>::type
+    encode(const T& arg) {
+//        auto& value = arg.get_value();
+        ei_x_encode_binary(current_buff(), arg.value.c_str(), (int)arg.value.length());
+    };
+
+    // string
     template <typename T>
     typename std::enable_if<detail::is_one_of<T, char *, unsigned char *>::value>::type
-    encode(const T& arg, TYPE tp = TYPE::String) {
-        if (tp == TYPE::String) {
-            ei_x_encode_string(current_buff(), arg);
-        } else {
-            ei_x_encode_binary(current_buff(), arg, (int)strlen(arg));
-        }
+    encode(const T& arg) {
+        ei_x_encode_string(current_buff(), arg);
+    };
+
+    template <typename T>
+    typename std::enable_if<std::is_base_of<detail::_Base, T>::value && T::category_type == TYPE::String>::type
+    encode(const T& arg) {
+        encode(arg.get_value());
     };
 
     void
-    encode(const std::string& arg, TYPE tp = TYPE::String) {
-        if (tp == TYPE::String) {
-            ei_x_encode_string_len(current_buff(), arg.c_str(), (int)arg.length());
-        } else {
-            ei_x_encode_binary(current_buff(), arg.c_str(), (int)arg.length());
-        }
+    encode(const std::string& arg) {
+        ei_x_encode_string_len(current_buff(), arg.c_str(), (int)arg.length());
     }
-
 
     std::string get_data() {
         std::string s(base_buff_->buff, (unsigned long)base_buff_->index);

@@ -160,6 +160,7 @@ int test_case4() {
 typedef int(*test_func_t)();
 
 int main() {
+    // decode test
     int ret;
     std::vector<test_func_t> funcs{
             test_case1, test_case2, test_case3, test_case4,
@@ -177,46 +178,42 @@ int main() {
     }
 
 
-    char *s1 = "Hello";
-    std::string s2("World!");
-
+    // encode test
     eipp::EIEncoder en;
-//    en.start_encode_list();
-//    en.encode(10);
-//    en.encode(29LL);
-//    en.encode(s1, eipp::TYPE::Binary);
-//    en.encode(s2, eipp::TYPE::Binary);
-//    en.end_encode_list();
 
-//    std::list<int> ll;
-//    ll.push_back(101);
-//    ll.push_back(202);
-//    ll.push_back(303);
-//    auto t = std::make_tuple(10, 29LL, s1, s2, ll);
-//    en.encode(t);
+    typedef std::tuple<int, std::string, std::list<eipp::Atom>> Person_t;
+    typedef std::map<eipp::Binary, std::list<int>> T1;
 
-//    std::list<std::tuple<int, int, std::string>> lt;
-//    lt.push_back(std::make_tuple(10, 101, "One"));
-//    lt.push_back(std::make_tuple(20, 202, "Two"));
-//    lt.push_back(std::make_tuple(30, 303, "Three"));
-//
-//    en.encode(lt);
+    std::tuple<std::string, int, Person_t, std::vector<Person_t>, T1> data;
 
-    typedef std::tuple<int, std::string> id_t;
-    std::tuple<int, std::string, std::list<id_t>, std::map<int, id_t>> data;
+    std::get<0>(data) = "Hello World!";
+    std::get<1>(data) = 101;
 
-    std::get<0>(data) = 101;
-    std::get<1>(data) = "Nihao";
+    auto p = std::make_tuple(1, "Jim", std::list<eipp::Atom>{eipp::Atom("j1"), eipp::Atom("j2")});
+    std::get<2>(data) = p;
 
-    auto& l3 = std::get<2>(data);
-    l3.push_back(std::make_tuple(1, "One"));
-    l3.push_back(std::make_tuple(2, "Two"));
-    l3.push_back(std::make_tuple(3, "Three"));
+    Person_t lp1;
+    std::get<0>(lp1) = 2;
+    std::get<1>(lp1) = "Tom";
+    std::get<2>(lp1).push_back(eipp::Atom("t1"));
+    std::get<2>(lp1).push_back(eipp::Atom("t2"));
+    std::get<2>(lp1).push_back(eipp::Atom("t3"));
 
-    auto& m4 = std::get<3>(data);
-    m4.insert(std::make_pair(1000, std::make_tuple(1000, "AAAA")));
-    m4.insert(std::make_pair(2000, std::make_tuple(2000, "BBBB")));
-    m4.insert(std::make_pair(3000, std::make_tuple(3000, "CCCC")));
+    std::get<3>(data).push_back(lp1);
+
+
+    Person_t lp2;
+    std::get<0>(lp2) = 3;
+    std::get<1>(lp2) = "David";
+    std::get<2>(lp2).push_back(eipp::Atom("d1"));
+    std::get<2>(lp2).push_back(eipp::Atom("d2"));
+    std::get<2>(lp2).push_back(eipp::Atom("d3"));
+
+    std::get<3>(data).push_back(lp2);
+
+    std::get<4>(data).insert(std::make_pair(eipp::Binary("binary 1"), std::list<int>{1,2,3}));
+    std::get<4>(data).insert(std::make_pair(eipp::Binary("binary 2"), std::list<int>{4,5,6}));
+    std::get<4>(data).insert(std::make_pair(eipp::Binary("binary 3"), std::list<int>{7,8,9}));
 
     en.encode(data);
 
