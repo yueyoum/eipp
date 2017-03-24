@@ -3,11 +3,13 @@
 
 #include <string>
 #include <vector>
+#include <list>
 #include <map>
 #include <stack>
 #include <tuple>
 #include <type_traits>
 #include <iterator>
+#include <functional>
 #include <ei.h>
 
 namespace eipp {
@@ -408,6 +410,12 @@ namespace detail {
         static constexpr bool value = __is_one_of_helper<TClear, Targets...>::value;
     };
 
+    template <typename T>
+    struct is_list: std::false_type{};
+
+    template <typename T>
+    struct is_list<std::list<T>>: std::true_type{};
+
 }
 
 // simple type
@@ -483,126 +491,178 @@ private:
 
 };
 
-//
-//class EIEncoder {
-//public:
-//
-//    EIEncoder() {
-//        base_buff_ = new ei_x_buff;
-//        ei_x_new_with_version(base_buff_);
-//        x_buff_stack_.push(base_buff_);
-//    }
-//
-//    EIEncoder(const EIEncoder&) = delete;
-//    EIEncoder&operator = (const EIEncoder&) = delete;
-//    EIEncoder(EIEncoder&&) = delete;
-//
-//    ~EIEncoder() {
-//        while(!x_buff_stack_.empty()) {
-//            delete x_buff_stack_.top();
-//            x_buff_stack_.pop();
-//        }
-//    }
-//
-//    void start_encode_list() {
-//        ei_x_buff* sub_buff = new ei_x_buff;
-//        x_buff_stack_.push(sub_buff);
-//
-//        incr_arity();
-//        init_arity();
-//    }
-//
-//    void end_encode_list() {
-//        auto arity = get_arity();
-//        auto this_buff = current_buff();
-//        x_buff_stack_.pop();
-//
-//        auto prev_buff = current_buff();
-//        ei_x_encode_list_header(prev_buff, arity);
-//        ei_x_append(prev_buff, this_buff);
-//        ei_x_encode_empty_list(prev_buff);
-//
-//        delete this_buff;
-//    }
-//
-//    template <typename T>
-//    typename std::enable_if<std::is_integral<T>::value &&
-//            ! detail::is_one_of<T, long long, unsigned long long>::value>::type
-//    encode(const T& arg) {
-//        std::cout << "encode long" << std::endl;
-//        ei_x_encode_long(current_buff(), (long)arg);
-//        incr_arity();
-//    }
-//
-//    template <typename T>
-//    typename std::enable_if<detail::is_one_of<T, long long, unsigned long long>::value>::type
-//    encode(const T& arg) {
-//        std::cout << "encode long long" << std::endl;
-//        ei_x_encode_longlong(current_buff(), (long long)arg);
-//        incr_arity();
-//    };
-//
-//    template <typename T>
-//    typename std::enable_if<std::is_floating_point<T>::value>::type
-//    encode(const T& arg) {
-//        ei_x_encode_double(current_buff(), (double)arg);
-//        incr_arity();
-//    }
-//
-//    template <typename T>
-//    typename std::enable_if<detail::is_one_of<T, char *, unsigned char *>::value>::type
-//    encode(const T& arg, TYPE tp = TYPE::String) {
-//        if (tp == TYPE::String) {
-//            ei_x_encode_string(current_buff(), arg);
-//        } else {
-//            ei_x_encode_binary(current_buff(), arg, (int)strlen(arg));
-//        }
-//
-//        incr_arity();
-//    };
-//
-//    void
-//    encode(const std::string& arg, TYPE tp = TYPE::String) {
-//        if (tp == TYPE::String) {
-//            ei_x_encode_string_len(current_buff(), arg.c_str(), (int)arg.length());
-//        } else {
-//            ei_x_encode_binary(current_buff(), arg.c_str(), (int)arg.length());
-//        }
-//
-//        incr_arity();
-//    }
-//
-//
-//    std::string get_data() {
-//        std::string s(base_buff_->buff, (unsigned long)base_buff_->index);
-//        return s;
-//    }
-//
-//private:
-//    ei_x_buff* base_buff_;
-//    std::stack<ei_x_buff*> x_buff_stack_;
-//    std::stack<int> arity_stack_;   // for list, tuple, map
-//
-//    ei_x_buff* current_buff() {
-//        return x_buff_stack_.top();
-//    }
-//
-//    void init_arity() {
-//        arity_stack_.push(0);
-//    }
-//
-//    void incr_arity() {
-//        if(!arity_stack_.empty()) {
-//            arity_stack_.top()++;
-//        }
-//    }
-//
-//    int get_arity() {
-//        int arity = arity_stack_.top();
-//        arity_stack_.pop();
-//        return arity;
-//    }
-//};
+
+class EIEncoder {
+public:
+    EIEncoder() {
+        base_buff_ = new ei_x_buff;
+        ei_x_new_with_version(base_buff_);
+        x_buff_stack_.push(base_buff_);
+    }
+
+    EIEncoder(const EIEncoder&) = delete;
+    EIEncoder&operator = (const EIEncoder&) = delete;
+    EIEncoder(EIEncoder&&) = delete;
+
+    ~EIEncoder() {
+        while(!x_buff_stack_.empty()) {
+            delete x_buff_stack_.top();
+            x_buff_stack_.pop();
+        }
+    }
+
+    // list
+    template <typename T>
+    typename std::enable_if<detail::is_list<T>::value>::type
+    encode(const T& arg) {
+        std::cout << "encode list" << std::endl;
+
+        auto arity = arg.size();
+        auto header_func = [&arity](ei_x_buff* this_buff) {
+            ei_x_encode_list_header(this_buff, arity);
+        };
+
+        CompoundEncoder en(this, header_func);
+
+        for(auto& element: arg) {
+            encode(element);
+        }
+
+        ei_x_encode_empty_list(current_buff());
+    }
+
+    // tuple
+    template <typename T>
+    typename std::enable_if<std::tuple_size<T>::value>::type
+    encode(const T& arg) {
+        std::cout << "encode tuple" << std::endl;
+        constexpr size_t arity = std::tuple_size<T>::value;
+
+        auto header_func = [&arity](ei_x_buff* this_buff) {
+            ei_x_encode_tuple_header(this_buff, arity);
+        };
+
+        CompoundEncoder en(this, header_func);
+
+        TupleEncoderHelper<arity, T>::encode(this, arg);
+    }
+
+    // map
+    template <typename T>
+    typename std::enable_if<
+            std::is_same<typename T::value_type, std::pair<const typename T::key_type, typename T::mapped_type>>::value>::type
+    encode(const T& arg) {
+        std::cout << "encode map" << std::endl;
+
+        auto arity = arg.size();
+        auto header_func = [&arity](ei_x_buff* this_buff) {
+            ei_x_encode_map_header(this_buff, arity);
+        };
+
+        CompoundEncoder en(this, header_func);
+
+        for(auto& iter: arg) {
+            encode(iter.first);
+            encode(iter.second);
+        }
+    };
+
+    template <typename T>
+    typename std::enable_if<std::is_integral<T>::value &&
+            ! detail::is_one_of<T, long long, unsigned long long>::value>::type
+    encode(const T& arg) {
+        ei_x_encode_long(current_buff(), (long)arg);
+    }
+
+    template <typename T>
+    typename std::enable_if<detail::is_one_of<T, long long, unsigned long long>::value>::type
+    encode(const T& arg) {
+        ei_x_encode_longlong(current_buff(), (long long)arg);
+    };
+
+    template <typename T>
+    typename std::enable_if<std::is_floating_point<T>::value>::type
+    encode(const T& arg) {
+        ei_x_encode_double(current_buff(), (double)arg);
+    }
+
+    template <typename T>
+    typename std::enable_if<detail::is_one_of<T, char *, unsigned char *>::value>::type
+    encode(const T& arg, TYPE tp = TYPE::String) {
+        if (tp == TYPE::String) {
+            ei_x_encode_string(current_buff(), arg);
+        } else {
+            ei_x_encode_binary(current_buff(), arg, (int)strlen(arg));
+        }
+    };
+
+    void
+    encode(const std::string& arg, TYPE tp = TYPE::String) {
+        if (tp == TYPE::String) {
+            ei_x_encode_string_len(current_buff(), arg.c_str(), (int)arg.length());
+        } else {
+            ei_x_encode_binary(current_buff(), arg.c_str(), (int)arg.length());
+        }
+    }
+
+
+    std::string get_data() {
+        std::string s(base_buff_->buff, (unsigned long)base_buff_->index);
+        return s;
+    }
+
+private:
+    struct CompoundEncoder {
+        EIEncoder* encoder;
+        std::function<void(ei_x_buff*)> header_func;
+
+        CompoundEncoder(EIEncoder* _en, std::function<void(ei_x_buff*)> _func): encoder(_en), header_func(_func) {
+            ei_x_buff* sub_buff = new ei_x_buff;
+            ei_x_new(sub_buff);
+            encoder->x_buff_stack_.push(sub_buff);
+        }
+
+        ~CompoundEncoder() {
+            auto sub_buff = encoder->x_buff_stack_.top();
+            encoder->x_buff_stack_.pop();
+            auto prev_buff = encoder->current_buff();
+
+            header_func(prev_buff);
+
+            ei_x_append(prev_buff, sub_buff);
+            delete sub_buff;
+        }
+
+    };
+
+
+    template<int N, typename T>
+    struct TupleEncoderHelper;
+
+    template<int N, typename T>
+    struct TupleEncoderHelper {
+        static void encode(EIEncoder* encoder, const T& tuple) {
+            constexpr auto index = std::tuple_size<T>::value - N;
+            auto& element = std::get<index>(tuple);
+            encoder->encode(element);
+            TupleEncoderHelper<N-1, T>::encode(encoder, tuple);
+        }
+    };
+
+    template <typename T>
+    struct TupleEncoderHelper<0, T> {
+        static void encode(EIEncoder*, const T&) {
+        }
+    };
+
+    ei_x_buff* base_buff_;
+    std::stack<ei_x_buff*> x_buff_stack_;
+
+    ei_x_buff* current_buff() {
+        return x_buff_stack_.top();
+    }
+
+};
 
 
 }

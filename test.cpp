@@ -1,6 +1,9 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <list>
+#include <tuple>
+#include <map>
 #include <typeinfo>
 #include <cstring>
 #include "eipp.h"
@@ -223,45 +226,77 @@ int test_case5() {
 typedef int(*test_func_t)();
 
 int main() {
-    int ret;
-    std::vector<test_func_t> funcs{
-            test_case1, test_case2, test_case3, test_case4,
-            test_case5,
-    };
-
-    for(test_func_t func: funcs) {
-        ret = func();
-        if(ret == -1) {
-            std::cerr << "parse error!" << std::endl;
-            return -1;
-        } else if(ret == -2) {
-            std::cerr << "compare failure!" << std::endl;
-            return -2;
-        }
-    }
+//    int ret;
+//    std::vector<test_func_t> funcs{
+//            test_case1, test_case2, test_case3, test_case4,
+//            test_case5,
+//    };
+//
+//    for(test_func_t func: funcs) {
+//        ret = func();
+//        if(ret == -1) {
+//            std::cerr << "parse error!" << std::endl;
+//            return -1;
+//        } else if(ret == -2) {
+//            std::cerr << "compare failure!" << std::endl;
+//            return -2;
+//        }
+//    }
 
 //    int number;
 //    std::cin >> number;
 //    std::cout << "number is: " << number << std::endl;
 
 
-//    char *s1 = "Hello";
-//    std::string s2("World!");
-//
-//    eipp::EIEncoder en;
+    char *s1 = "Hello";
+    std::string s2("World!");
+
+    eipp::EIEncoder en;
 //    en.start_encode_list();
 //    en.encode(10);
 //    en.encode(29LL);
 //    en.encode(s1, eipp::TYPE::Binary);
 //    en.encode(s2, eipp::TYPE::Binary);
 //    en.end_encode_list();
+
+//    std::list<int> ll;
+//    ll.push_back(101);
+//    ll.push_back(202);
+//    ll.push_back(303);
+//    auto t = std::make_tuple(10, 29LL, s1, s2, ll);
+//    en.encode(t);
+
+//    std::list<std::tuple<int, int, std::string>> lt;
+//    lt.push_back(std::make_tuple(10, 101, "One"));
+//    lt.push_back(std::make_tuple(20, 202, "Two"));
+//    lt.push_back(std::make_tuple(30, 303, "Three"));
 //
-//    std::cout << "encode done" << std::endl;
-//
-//    auto s = en.get_data();
-//    std::ofstream f("/tmp/eippout");
-//    f << s;
-//    f.close();
+//    en.encode(lt);
+
+    typedef std::tuple<int, std::string> id_t;
+    std::tuple<int, std::string, std::list<id_t>, std::map<int, id_t>> data;
+
+    std::get<0>(data) = 101;
+    std::get<1>(data) = "Nihao";
+
+    auto& l3 = std::get<2>(data);
+    l3.push_back(std::make_tuple(1, "One"));
+    l3.push_back(std::make_tuple(2, "Two"));
+    l3.push_back(std::make_tuple(3, "Three"));
+
+    auto& m4 = std::get<3>(data);
+    m4.insert(std::make_pair(1000, std::make_tuple(1000, "AAAA")));
+    m4.insert(std::make_pair(2000, std::make_tuple(2000, "BBBB")));
+    m4.insert(std::make_pair(3000, std::make_tuple(3000, "CCCC")));
+
+    en.encode(data);
+
+    std::cout << "encode done" << std::endl;
+
+    auto s = en.get_data();
+    std::ofstream f("/tmp/eippout");
+    f << s;
+    f.close();
 
     return 0;
 
