@@ -21,7 +21,6 @@ enum class TYPE {
     Binary,
     Atom,
     List,
-    MultiTypeList,
     Tuple,
     Map
 };
@@ -432,9 +431,6 @@ using Tuple = detail::CompoundType<TYPE::Tuple, ei_decode_tuple_header, Types...
 
 template <typename T>
 using List = detail::SoleTypeListType<T>;
-
-template <typename ... Types>
-using MultiTypeList = detail::CompoundType<TYPE::MultiTypeList, ei_decode_list_header, Types...>;
 
 template <typename KT, typename VT>
 using Map = detail::MapType<KT, VT>;

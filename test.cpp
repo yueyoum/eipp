@@ -156,72 +156,6 @@ int test_case4() {
 }
 
 
-int test_case5() {
-    std::cout << std::endl << "test case 5" << std::endl;
-
-    ContentLoader cl("./test_data/case5");
-    auto content = cl.get_buf();
-
-    using T = eipp::Tuple<eipp::Long, eipp::Long, eipp::String>;
-    using T1 = eipp::Map<eipp::Long, T>;
-    using T2 = eipp::MultiTypeList<eipp::Long, T, T1>;
-
-    eipp::EIDecoder decoder(content);
-    auto result = decoder.parse<T2>();
-    if(!decoder.is_valid()) {
-        return -1;
-    }
-
-
-    auto v1 = result->get<0>();
-    auto v2 = result->get<1>();
-    auto v3 = result->get<2>();
-
-    std::cout << v1 << std::endl;
-
-    if(v1 != 555) {
-        return -2;
-    }
-
-    auto tv1 = v2->get<0>();
-    auto tv2 = v2->get<1>();
-    auto tv3 = v2->get<2>();
-
-    std::cout << tv1 << std::endl;
-    std::cout << tv2 << std::endl;
-    std::cout << tv3 << std::endl;
-
-    if (tv1 != 1) {
-        return -2;
-    }
-
-    if (tv2 != 2) {
-        return -2;
-    }
-
-    if (tv3 != "case5") {
-        return -2;
-    }
-
-
-    for(auto& iter: *v3) {
-        std::cout << typeid(iter.first).name() << ", " << iter.first << std::endl;
-        auto tuple = iter.second;
-        auto mv1 = tuple->get<0>();
-        auto mv2 = tuple->get<1>();
-        auto mv3 = tuple->get<2>();
-
-        std::cout << "    " << typeid(mv1).name() << ", " << mv1 << std::endl;
-        std::cout << "    " << typeid(mv2).name() << ", " << mv2 << std::endl;
-        std::cout << "    " << typeid(mv3).name() << ", " << mv3 << std::endl;
-    }
-
-    return 0;
-}
-
-
-
-
 
 typedef int(*test_func_t)();
 
@@ -229,7 +163,6 @@ int main() {
     int ret;
     std::vector<test_func_t> funcs{
             test_case1, test_case2, test_case3, test_case4,
-            test_case5,
     };
 
     for(test_func_t func: funcs) {
