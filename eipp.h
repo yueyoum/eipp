@@ -19,6 +19,7 @@ enum class TYPE {
     Float,
     String,
     Binary,
+    Atom,
     List,
     MultiTypeList,
     Tuple,
@@ -85,32 +86,28 @@ namespace detail {
         }
 
         int decode(const char* buf, int* index) override {
-            return Decoder()(buf, index, this);
+            return Decoder()(buf, index, value);
         }
 
     private:
-        friend struct LongDecoder;
-        friend struct DoubleDecoder;
-        friend struct StringDecoder;
-        friend struct BinaryDecoder;
         T value;
     };
 
 
     struct LongDecoder {
-        int operator ()(const char* buf, int* index, SingleType<TYPE::Integer, long, LongDecoder>* s) {
-            return ei_decode_long(buf, index, &(s->value));
+        int operator ()(const char* buf, int* index, long& value) {
+            return ei_decode_long(buf, index, &value);
         }
     };
 
     struct DoubleDecoder {
-        int operator ()(const char* buf, int* index, SingleType<TYPE::Float, double, DoubleDecoder>* s) {
-            return ei_decode_double(buf, index, &(s->value));
+        int operator ()(const char* buf, int* index, double& value) {
+            return ei_decode_double(buf, index, &value);
         }
     };
 
     struct StringDecoder {
-        int operator ()(const char* buf, int* index, SingleType<TYPE::String, std::string, StringDecoder>* s) {
+        int operator ()(const char* buf, int* index, std::string& value) {
             int tp=0, len=0, ret=0;
             ret = ei_get_type(buf, index, &tp, &len);
             if(ret == -1) return ret;
@@ -119,23 +116,23 @@ namespace detail {
             ret = ei_decode_string(buf, index, ptr);
             if(ret == -1) return ret;
 
-            s->value = std::string(ptr, (unsigned long)len);
+            value = std::string(ptr, (unsigned long)len);
             delete[] ptr;
             return ret;
         }
     };
 
     struct BinaryDecoder {
-        int operator ()(const char* buf, int* index, SingleType<TYPE::Binary, std::string, BinaryDecoder>* s) {
+        int operator ()(const char* buf, int* index, std::string& value) {
             int tp=0, len=0, ret=0;
             ret = ei_get_type(buf, index, &tp, &len);
             if(ret == -1) return ret;
 
             char* ptr = new char[len+1]();
-            ret = ei_decode_binary(buf, index, ptr, (long*)&ret);
+            ret = ei_decode_binary(buf, index, ptr, (long*)&len);
             if(ret == -1) return ret;
 
-            s->value = std::string(ptr, (unsigned long)len);
+            value = std::string(ptr, (unsigned long)len);
             delete[] ptr;
             return ret;
         }
@@ -533,7 +530,7 @@ public:
 
     // tuple
     template <typename T>
-    typename std::enable_if<std::tuple_size<T>::value>::type
+    typename std::enable_if<std::tuple_size<T>::value >= 0 >::type
     encode(const T& arg) {
         std::cout << "encode tuple" << std::endl;
         constexpr size_t arity = std::tuple_size<T>::value;

@@ -226,26 +226,22 @@ int test_case5() {
 typedef int(*test_func_t)();
 
 int main() {
-//    int ret;
-//    std::vector<test_func_t> funcs{
-//            test_case1, test_case2, test_case3, test_case4,
-//            test_case5,
-//    };
-//
-//    for(test_func_t func: funcs) {
-//        ret = func();
-//        if(ret == -1) {
-//            std::cerr << "parse error!" << std::endl;
-//            return -1;
-//        } else if(ret == -2) {
-//            std::cerr << "compare failure!" << std::endl;
-//            return -2;
-//        }
-//    }
+    int ret;
+    std::vector<test_func_t> funcs{
+            test_case1, test_case2, test_case3, test_case4,
+            test_case5,
+    };
 
-//    int number;
-//    std::cin >> number;
-//    std::cout << "number is: " << number << std::endl;
+    for(test_func_t func: funcs) {
+        ret = func();
+        if(ret == -1) {
+            std::cerr << "parse error!" << std::endl;
+            return -1;
+        } else if(ret == -2) {
+            std::cerr << "compare failure!" << std::endl;
+            return -2;
+        }
+    }
 
 
     char *s1 = "Hello";
