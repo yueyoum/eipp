@@ -508,10 +508,17 @@ private:
 
 
 class EIEncoder {
+private:
+    struct XBuffWrapper;
+
 public:
-    EIEncoder() {
-        base_buff_ = new ei_x_buff;
-        ei_x_new_with_version(base_buff_);
+    EIEncoder(): ret_(0) {
+        base_buff_ = new XBuffWrapper();
+
+        ret_ = ei_x_new_with_version(base_buff_->x_buff);
+        base_buff_->keep();
+        if(ret_!=0) return;
+
         x_buff_stack_.push(base_buff_);
     }
 
@@ -521,7 +528,8 @@ public:
 
     ~EIEncoder() {
         while(!x_buff_stack_.empty()) {
-            delete x_buff_stack_.top();
+            auto* buf = x_buff_stack_.top();
+            delete buf;
             x_buff_stack_.pop();
         }
     }
@@ -532,12 +540,17 @@ public:
     encode(const T& arg) {
         auto arity = arg.size();
         if(arity == 0) {
-            ei_x_encode_empty_list(current_buff());
+            auto* buff = current_buff();
+            buff->keep();
+            ret_ = ei_x_encode_empty_list(buff->x_buff);
+            buff->keep();
             return;
         }
 
-        auto header_func = [&arity](ei_x_buff* this_buff) {
-            ei_x_encode_list_header(this_buff, arity);
+        auto header_func = [this, &arity](XBuffWrapper* this_buff) {
+            this_buff->keep();
+            this->ret_ = ei_x_encode_list_header(this_buff->x_buff, arity);
+            this_buff->keep();
         };
 
         CompoundEncoder en(this, header_func);
@@ -546,7 +559,10 @@ public:
             encode(element);
         }
 
-        ei_x_encode_empty_list(current_buff());
+        auto* buff = current_buff();
+        buff->keep();
+        ret_ = ei_x_encode_empty_list(buff->x_buff);
+        buff->keep();
     }
 
     // tuple
@@ -555,11 +571,17 @@ public:
     encode(const T& arg) {
         constexpr size_t arity = std::tuple_size<T>::value;
         if(arity == 0) {
-            ei_x_encode_tuple_header(current_buff(), 0);
+            auto* buff = current_buff();
+            buff->keep();
+            ret_ = ei_x_encode_tuple_header(buff->x_buff, 0);
+            buff->keep();
+            return;
         }
 
-        auto header_func = [&arity](ei_x_buff* this_buff) {
-            ei_x_encode_tuple_header(this_buff, arity);
+        auto header_func = [this, &arity](XBuffWrapper* this_buff) {
+            this_buff->keep();
+            this->ret_ = ei_x_encode_tuple_header(this_buff->x_buff, arity);
+            this_buff->keep();
         };
 
         CompoundEncoder en(this, header_func);
@@ -573,12 +595,17 @@ public:
     encode(const T& arg) {
         auto arity = arg.size();
         if(arity == 0) {
-            ei_x_encode_map_header(current_buff(), 0);
+            auto* buff = current_buff();
+            buff->keep();
+            ret_ = ei_x_encode_map_header(buff->x_buff, 0);
+            buff->keep();
             return;
         }
 
-        auto header_func = [&arity](ei_x_buff* this_buff) {
-            ei_x_encode_map_header(this_buff, arity);
+        auto header_func = [this, &arity](XBuffWrapper* this_buff) {
+            this_buff->keep();
+            this->ret_ = ei_x_encode_map_header(this_buff->x_buff, arity);
+            this_buff->keep();
         };
 
         CompoundEncoder en(this, header_func);
@@ -593,37 +620,50 @@ public:
     template <typename T>
     typename std::enable_if<std::is_integral<T>::value>::type
     encode(const T& arg) {
-        ei_x_encode_long(current_buff(), (long)arg);
+        auto* buff = current_buff();
+        buff->keep();
+        ret_ = ei_x_encode_long(buff->x_buff, (long)arg);
+        buff->keep();
     }
 
     // double
     template <typename T>
     typename std::enable_if<std::is_floating_point<T>::value>::type
     encode(const T& arg) {
-        ei_x_encode_double(current_buff(), (double)arg);
+        auto* buff = current_buff();
+        buff->keep();
+        ret_ = ei_x_encode_double(buff->x_buff, (double)arg);
+        buff->keep();
     }
 
     // atom
     template <typename T>
     typename std::enable_if<std::is_base_of<detail::_Base, T>::value && T::category_type == TYPE::Atom>::type
     encode(const T& arg) {
-//        auto& value = arg.get_value();
-        ei_x_encode_atom_len(current_buff(), arg.value.c_str(), (int)arg.value.length());
+        auto* buff = current_buff();
+        buff->keep();
+        ret_ = ei_x_encode_atom_len(buff->x_buff, arg.value.c_str(), (int)arg.value.length());
+        buff->keep();
     };
 
     // binary
     template <typename T>
     typename std::enable_if<std::is_base_of<detail::_Base, T>::value && T::category_type == TYPE::Binary>::type
     encode(const T& arg) {
-//        auto& value = arg.get_value();
-        ei_x_encode_binary(current_buff(), arg.value.c_str(), (int)arg.value.length());
+        auto* buff = current_buff();
+        buff->keep();
+        ret_ = ei_x_encode_binary(buff->x_buff, arg.value.c_str(), (int)arg.value.length());
+        buff->keep();
     };
 
     // string
     template <typename T>
     typename std::enable_if<detail::is_one_of<T, char *, unsigned char *>::value>::type
     encode(const T& arg) {
-        ei_x_encode_string(current_buff(), arg);
+        auto* buff = current_buff();
+        buff->keep();
+        ret_ = ei_x_encode_string(buff->x_buff, arg);
+        buff->keep();
     };
 
     template <typename T>
@@ -634,33 +674,71 @@ public:
 
     void
     encode(const std::string& arg) {
-        ei_x_encode_string_len(current_buff(), arg.c_str(), (int)arg.length());
+        auto* buff = current_buff();
+        buff->keep();
+        ret_ = ei_x_encode_string_len(buff->x_buff, arg.c_str(), (int)arg.length());
+        buff->keep();
+    }
+
+    bool is_valid() const {
+        return ret_ == 0;
     }
 
     std::string get_data() {
-        std::string s(base_buff_->buff, (unsigned long)base_buff_->index);
+        if(ret_!=0) {
+            return std::string();
+        }
+
+        std::string s(base_buff_->x_buff->buff, (unsigned long)base_buff_->x_buff->index);
         return s;
     }
 
 private:
+    struct XBuffWrapper {
+        ei_x_buff* x_buff;
+        char* orig_char_buff;
+
+        XBuffWrapper() {
+            x_buff = new ei_x_buff();
+            x_buff->buff = nullptr;
+            orig_char_buff = nullptr;
+        }
+
+        ~XBuffWrapper() {
+            if(orig_char_buff) free(orig_char_buff);
+            delete x_buff;
+        }
+
+        void keep() {
+            if(x_buff->buff) {
+                orig_char_buff = x_buff->buff;
+            }
+        }
+    };
+
+
     struct CompoundEncoder {
         EIEncoder* encoder;
-        std::function<void(ei_x_buff*)> header_func;
+        std::function<void(XBuffWrapper*)> header_func;
 
-        CompoundEncoder(EIEncoder* _en, std::function<void(ei_x_buff*)> _func): encoder(_en), header_func(_func) {
-            ei_x_buff* sub_buff = new ei_x_buff;
-            ei_x_new(sub_buff);
+        CompoundEncoder(EIEncoder* _en, std::function<void(XBuffWrapper*)> _func): encoder(_en), header_func(_func) {
+            XBuffWrapper* sub_buff = new XBuffWrapper();
+            encoder->ret_ = ei_x_new(sub_buff->x_buff);
+            sub_buff->keep();
             encoder->x_buff_stack_.push(sub_buff);
         }
 
         ~CompoundEncoder() {
-            auto sub_buff = encoder->x_buff_stack_.top();
+            auto* sub_buff = encoder->x_buff_stack_.top();
             encoder->x_buff_stack_.pop();
-            auto prev_buff = encoder->current_buff();
+            auto* prev_buff = encoder->current_buff();
 
             header_func(prev_buff);
 
-            ei_x_append(prev_buff, sub_buff);
+            prev_buff->keep();
+            encoder->ret_ = ei_x_append(prev_buff->x_buff, sub_buff->x_buff);
+            prev_buff->keep();
+
             delete sub_buff;
         }
 
@@ -686,10 +764,11 @@ private:
         }
     };
 
-    ei_x_buff* base_buff_;
-    std::stack<ei_x_buff*> x_buff_stack_;
+    int ret_;
+    XBuffWrapper* base_buff_;
+    std::stack<XBuffWrapper*> x_buff_stack_;
 
-    ei_x_buff* current_buff() {
+    XBuffWrapper* current_buff() {
         return x_buff_stack_.top();
     }
 
