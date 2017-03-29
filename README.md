@@ -20,7 +20,7 @@ The library **ONLY** support the following types:
     *   `eipp::Binary`
 *   atom. (same as string for cpp)
     *   `eipp::Atom`
-*   list. (different or same type elements, any type supported here)
+*   list. (same type elements, any type supported here)
     *   `eipp::List<T>`: elements are all of type T
 *   tuple. (some elements, any type supported here)
     *   `eipp::Tuple<T1, T2...>`
